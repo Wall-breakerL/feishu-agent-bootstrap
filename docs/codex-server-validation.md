@@ -41,7 +41,7 @@ codex -c features.use_legacy_landlock=true \
 - bridge 状态保存在 `/root/.local/state/feishu-agent/codex`；Codex 原生记录保存在 `/root/.codex`。
 - 私密配置保存在 `/root/.config/feishu-agent/codex.env`，API 凭证不进入此路线。
 
-飞书收发、指定命令的单次允许与拒绝、bridge 重启续聊，以及模型切换和选择持久化都已通过。后续还完成了机器人群内协作、实例重启后的人工恢复和开机钩子接入。修复后的整机自动恢复、换服务器、长任务及其他用户加入仍待测试，详见 [服务器记录](server-operations.md)。
+飞书收发、指定命令的单次允许与拒绝、bridge 重启续聊，以及模型切换和选择持久化都已通过。后续还完成了机器人群内协作、实例重启后的人工恢复和开机钩子接入。双机器人目前已切换到另一台实例，具体通过项和待验收项见 [换机记录](server-migration-validation.md)；新机开机策略留待讨论，长任务及其他用户加入仍待测试。
 
 ## 飞书文本审批
 
