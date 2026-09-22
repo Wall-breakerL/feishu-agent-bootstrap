@@ -63,7 +63,7 @@ resolve_mentions = true
 mention_map = { "ServerCC" = "${FEISHU_PEER_BOT_ID}" }
 ```
 
-6. 在 `[display]` 中设置 `thinking_messages = false`、`tool_messages = true`，避免计划预览里的提及意外触发对端，保留工具过程提示。给两边的 `append_system_prompt` 加入下述协作约定，备份后重启 bridge，再做实际消息验收。
+6. 在 `[display]` 中设置 `mode = "compact"`、`thinking_messages = false`、`tool_messages = false`，隐藏思考和逐次工具调用提示，保留文字说明、审批请求及最终回复。给两边的 `append_system_prompt` 加入下述协作约定，备份后重启 bridge，再做实际消息验收。
 
 ### 协作约定与使用方式
 
@@ -91,6 +91,21 @@ cc-connect v1.5.0 会把含真实提及的整条消息转成普通文本，以�
 四份配置模板的 `append_system_prompt` 均包含 `FEISHU_MESSAGE_FORMAT_V1` 回复约定，默认启用卡片。升级已有部署时，需把约定追加到两份私密运行配置，保留各自已有的对端别名、任务轮数、模型及审批规则；只更新仓库模板不会覆盖运行配置。检查没有正在执行或待审批的任务后，备份运行配置，再分别重启 bridge。卡片回调还需在应用发布版本中包含 `card.action.trigger`。
 
 这是配置与提示词约定，尚未改成程序强制拆分消息；模型若把提及和长报告混在同一条回复中，仍会触发纯文本路径。手机端需按 [A16](acceptance.md) 验收标题、列表、代码块、表格、附件和机器人回报，并另测审批按钮。卡片不能保证完整复现 GitHub 的所有 Markdown 扩展。
+
+### 减少工具消息刷屏
+
+四份模板默认使用以下显示配置。`compact` 隐藏逐次工具调用和思考提示，机器人在工具调用前后输出的文字说明仍可能分别显示。
+
+```toml
+[display]
+mode = "compact"
+thinking_messages = false
+tool_messages = false
+```
+
+显式的 `thinking_messages` / `tool_messages` 优先于模式默认值，所以升级已有配置时要一起检查，不能留下 `tool_messages = true`。`[projects.display]` 下的同名配置又优先于全局设置，存在时也需核对。
+
+手机端可在两个机器人的私聊分别发送 `/config mode compact`；群里先真实 @ 对应机器人。该命令立即切换当前 bridge 的显示模式并写回配置，影响该机器人各会话。工具审批仍按原规则出现，模型及推理强度不受显示设置影响。排查问题时可临时用 `/config tool_messages true` 查看工具提示，再用 `/config mode compact` 恢复。旧聊天消息不会被删除或重新排版。[上游显示配置](https://github.com/chenhg5/cc-connect/blob/v1.5.0/config.example.toml#L112)
 
 这次选择飞书原生 @ 消息，是为了在两个独立 bridge 之间传递任务，并保留原有审批。`cc-connect relay` 在 v1.5.0 中使用单进程内的 agent 注册表，`HandleRelay` 还会自动批准收到的工具权限请求，因此没有采用。[上游实现](https://github.com/chenhg5/cc-connect/blob/v1.5.0/core/engine.go)
 

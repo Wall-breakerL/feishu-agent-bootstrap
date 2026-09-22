@@ -2,6 +2,11 @@
 language = "zh"
 data_dir = "${BRIDGE_STATE_DIR}"
 
+[display]
+mode = "compact"
+thinking_messages = false
+tool_messages = false
+
 [log]
 level = "info"
 

@@ -35,6 +35,8 @@
 
 本项目模板默认开启 `enable_feishu_card`，不发 reaction。配置长连接回调 `card.action.trigger`，核对控制台要求的权限并发布；卡片按钮必须测试批准和拒绝。普通 Markdown 回复由桥接选择卡片或富文本发送；含真实提及的消息仍会转成普通文本，因此机器人派工通知与报告摘要需分开发送，见 [消息排版约定](robot-reuse-and-groups.md#消息排版与报告交付)。
 
+显示模式默认 `compact`，同时显式关闭 `thinking_messages` 和 `tool_messages`，减少逐次工具调用刷屏；文字说明、审批请求和最终回复仍保留。已有部署需更新私密运行配置，不能只替换仓库模板，详见 [显示配置](robot-reuse-and-groups.md#减少工具消息刷屏)。
+
 上游还提供 `cc-connect feishu setup --project my-project` 命令，用于扫码创建或关联应用，可能回填凭证及白名单，并修改它选中的配置文件。使用前检查该路径是否已有配置，避免影响其他机器人；本项目模板不依赖该自动配置流程。不要把带 App Secret 的 `--app id:secret` 命令保存进历史或文档。
 
 获取本人在**这个应用下**的 `open_id`，用于 `FEISHU_ALLOW_FROM`。用户 ID、邮箱、手机号、另一应用的 open_id 不能混用。白名单确认后，`/whoami` 可用于复核；不得为了获取 ID 长期留空或设为 `*`。
