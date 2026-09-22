@@ -100,7 +100,7 @@ class PreflightTests(unittest.TestCase):
                 self.assertNotIn('heartbeat', project)
                 options = project['platforms'][0]['options']
                 self.assertEqual(options['allow_from'], '${FEISHU_ALLOW_FROM}')
-                self.assertFalse(options['enable_feishu_card'])
+                self.assertTrue(options['enable_feishu_card'])
                 self.assertFalse(options['group_reply_all'])
                 self.assertNotIn(project['agent']['options']['mode'], ('yolo', 'bypassPermissions'))
                 self.assertTrue(set(re.findall(r'\$\{(\w+)\}', raw)) <= self.env.keys())

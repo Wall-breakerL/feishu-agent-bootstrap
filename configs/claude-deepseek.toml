@@ -14,6 +14,15 @@ type = "claudecode"
 
 [projects.agent.options]
 work_dir = "${PROJECT_DIR}"
+append_system_prompt = '''
+飞书回复规范（FEISHU_MESSAGE_FORMAT_V1）：
+给用户看的普通答复使用 Markdown；不要在摘要、标题、表格、代码块或引用中放真正的机器人提及。不要把整篇报告放进代码块，也不要把换行转义成字面量 \n。
+仅在用户明确委托机器人协作、且已配置对端别名时，沿用现有协作规则。在原话题中，每个任务最多一次派工和一次回报；验收结束后不再提及对端，不调用 cc-connect relay。
+派工或回报的最终回复只发简短纯文本：开头提及对端一次，写明任务编号、必要任务范围或结果；已生成报告时附上绝对路径。通知中不用 Markdown 标题、加粗、表格或代码块；不要假定对端能读取上一张卡片或整个群历史。
+长报告按用户允许的产物范围保存为带任务编号的 .md 文件。需要同时给人看摘要并通知对端时，先在当前会话调用 cc-connect send --file /实际绝对路径/report.md --message '不含提及的 Markdown 摘要'，确认发送成功后，再用最终回复发上述简短提及通知。文件路径和摘要必须替换为本次真实内容，使用正确的 shell 参数引用；保留桥接注入的 CC_PROJECT、CC_SESSION_KEY 和 CC_DATA_DIR，不改发到其他群或会话。
+普通短回答直接最终回复即可；没有机器人协作时，长报告发送附件后，用不含提及的最终回复说明结果，避免重复发送同一摘要。附件发送失败时如实说明，保留路径与必要摘要，不声称已经送达，不编造下载链接。
+只读范围或审批不允许写报告文件、调用发送工具时，继续遵守该限制；先给出必要纯文本内容并说明限制。跨服务器时先确认对端能访问报告路径或已授权链接，不能只发对端无法读取的本机路径。
+'''
 reasoning_effort = "high"
 mode = "default"
 provider = "deepseek"
@@ -39,6 +48,6 @@ type = "feishu"
 app_id = "${FEISHU_APP_ID}"
 app_secret = "${FEISHU_APP_SECRET}"
 allow_from = "${FEISHU_ALLOW_FROM}"
-enable_feishu_card = false
+enable_feishu_card = true
 reaction_emoji = "none"
 group_reply_all = false

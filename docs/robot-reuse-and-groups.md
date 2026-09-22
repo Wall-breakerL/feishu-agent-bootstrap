@@ -56,6 +56,7 @@
 
 ```toml
 group_reply_all = false
+enable_feishu_card = true
 allow_chat = "${FEISHU_TEST_CHAT_ID}"
 thread_isolation = true
 resolve_mentions = true
@@ -69,6 +70,27 @@ mention_map = { "ServerCC" = "${FEISHU_PEER_BOT_ID}" }
 每个任务使用唯一任务编号；派工和回报都放在原话题中。Codex 最终派工消息以 `@ServerCC` 开头，CC 最终回报以 `@ServerCodex` 开头；别名会被转换为真正的飞书提及。仅在明确派工或回报时提及对端，思考、工具说明和引用中不要提及。收到完成回报后，Codex 验收并向用户报告，结束时不再提及机器人。每个任务约定最多一次派工和一次回报；这是提示词约定，尚未实现程序层面的轮数上限。
 
 用户发起任务时，在飞书输入框选择真正的 `@Server Codex`，要求它把具体任务交给 CC 并等待回报。若 CC 请求工具权限，在**同一话题**中 `@Server CC` 回复「允许」或「拒绝」；本次使用单次允许，没有选择允许所有。API 派工不绕过原有工具审批，涉及待批操作时仍需人介入。
+
+### 消息排版与报告交付
+
+cc-connect v1.5.0 会把含真实提及的整条消息转成普通文本，以便触发对端机器人。即使开启卡片，夹在这条消息中的 Markdown 也不会自动变成卡片排版。没有提及的 Markdown 回复通常使用卡片，超过当前卡片表格数量限制时回退到富文本。[发送类型选择源码](https://github.com/chenhg5/cc-connect/blob/v1.5.0/platform/feishu/feishu.go#L3090)
+
+两条路线采用下面的交付约定。
+
+| 内容 | 发送方式 |
+|---|---|
+| 普通问答 | 直接返回不含机器人提及的 Markdown，由桥接渲染 |
+| 长报告 | 按任务允许的产物范围保存 `.md`，发送附件及不含提及的摘要 |
+| 派工、回报 | 在最终回复中只发简短的真实提及、任务编号、必要范围或结果、报告绝对路径 |
+| 最终验收 | 向用户说明结果，结束时不再提及机器人 |
+
+需要同时交付报告和回报对端时，agent 在当前会话调用 `cc-connect send --file /实际绝对路径/report.md --message '不含提及的 Markdown 摘要'`，成功后再用最终回复发送简短通知。这会把摘要和附件分别发出；最终的提及消息负责触发另一个机器人。路径和摘要使用实际内容，复杂文本需正确处理 shell 引用。保留 bridge 注入的 `CC_PROJECT`、`CC_SESSION_KEY` 和 `CC_DATA_DIR`，不另选群或会话。附件发送失败时如实报告，不声称已经送达。[上游附件说明](https://github.com/chenhg5/cc-connect/blob/v1.5.0/docs/usage.md)
+
+当前两个 agent 共用服务器，可以按绝对路径读取同一份报告；不能假定对端能读到上一张卡片或完整群历史。换到不同服务器时，需先提供双方确实可访问的文件或授权链接。任务禁止写文件或工具仍待审批时，先遵守该限制，不为排版自动放开权限。
+
+四份配置模板的 `append_system_prompt` 均包含 `FEISHU_MESSAGE_FORMAT_V1` 回复约定，默认启用卡片。升级已有部署时，需把约定追加到两份私密运行配置，保留各自已有的对端别名、任务轮数、模型及审批规则；只更新仓库模板不会覆盖运行配置。检查没有正在执行或待审批的任务后，备份运行配置，再分别重启 bridge。卡片回调还需在应用发布版本中包含 `card.action.trigger`。
+
+这是配置与提示词约定，尚未改成程序强制拆分消息；模型若把提及和长报告混在同一条回复中，仍会触发纯文本路径。手机端需按 [A16](acceptance.md) 验收标题、列表、代码块、表格、附件和机器人回报，并另测审批按钮。卡片不能保证完整复现 GitHub 的所有 Markdown 扩展。
 
 这次选择飞书原生 @ 消息，是为了在两个独立 bridge 之间传递任务，并保留原有审批。`cc-connect relay` 在 v1.5.0 中使用单进程内的 agent 注册表，`HandleRelay` 还会自动批准收到的工具权限请求，因此没有采用。[上游实现](https://github.com/chenhg5/cc-connect/blob/v1.5.0/core/engine.go)
 

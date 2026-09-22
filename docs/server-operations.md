@@ -123,3 +123,9 @@ exec /bin/bash /root/tools/feishu-agent-bootstrap/scripts/start-after-boot.sh
 - bridge 映射在私密状态目录 `api/sessions/`，Claude 原生会话与本次写入的项目记忆在 `/root/.claude/projects/`；重启只载入映射不足以证明续聊，要同时确认原生记录可用。
 
 两条运行配置和对应模板均已固定 `reasoning_effort = "high"`，重启后真实调用记录一致。私有测试群已完成 Codex 派工 → CC 统计文件 → 同话题单次审批 → CC 回报 → Codex 验收；目前按话题保存上下文，仅允许本人和已核实的对端机器人。换机复用及完整群聊配置见 [机器人换机与群聊共用](robot-reuse-and-groups.md)。其他用户加入与多人共享上下文尚未测试。
+
+## 2026-09-22 消息排版调整
+
+两份私密运行配置已开启 `enable_feishu_card`，并追加 `FEISHU_MESSAGE_FORMAT_V1` 回复约定：普通回复和报告摘要不带机器人提及，长报告按允许的产物范围发送 `.md` 附件，派工或回报用独立的简短提及通知。原有对端别名、单次派工与回报约定、模型和审批模式保留。四份部署模板也已同步；具体交付步骤见 [消息排版与报告交付](robot-reuse-and-groups.md#消息排版与报告交付)。
+
+现场确认两个 agent 的任务已结束后，备份运行配置和 bridge 会话记录，再重启两条 bridge。启动前检查通过，重启后两份 bridge 会话文件与备份逐字节一致。本地 16 项离线检查通过。手机排版、附件下载、修改后的机器人往返及卡片批准/拒绝仍待实测，不能把配置载入等同于端到端通过。
