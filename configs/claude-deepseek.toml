@@ -1,0 +1,44 @@
+# Pin the model explicitly; refresh its availability against official provider docs.
+language = "zh"
+data_dir = "${BRIDGE_STATE_DIR}"
+
+[log]
+level = "info"
+
+[[projects]]
+name = "${PROJECT_NAME}"
+reset_on_idle_mins = 0
+
+[projects.agent]
+type = "claudecode"
+
+[projects.agent.options]
+work_dir = "${PROJECT_DIR}"
+reasoning_effort = "high"
+mode = "default"
+provider = "deepseek"
+
+[projects.agent.options.env]
+ANTHROPIC_API_KEY = ""
+CLAUDE_CODE_OAUTH_TOKEN = ""
+
+[[projects.agent.providers]]
+name = "deepseek"
+base_url = "https://api.deepseek.com/anthropic"
+api_key = "${DEEPSEEK_API_KEY}"
+model = "${DEEPSEEK_MODEL}"
+
+# Add verified provider.models entries in the PRIVATE runtime config if needed.
+# No fixed alias environment variables: /model should control the main model.
+# Verify any Claude Code subagent model overrides separately on the server.
+
+[[projects.platforms]]
+type = "feishu"
+
+[projects.platforms.options]
+app_id = "${FEISHU_APP_ID}"
+app_secret = "${FEISHU_APP_SECRET}"
+allow_from = "${FEISHU_ALLOW_FROM}"
+enable_feishu_card = false
+reaction_emoji = "none"
+group_reply_all = false

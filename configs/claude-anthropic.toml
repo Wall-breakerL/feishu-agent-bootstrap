@@ -1,0 +1,39 @@
+# Claude Code with the official Anthropic API; no Claude subscription login.
+language = "zh"
+data_dir = "${BRIDGE_STATE_DIR}"
+
+[log]
+level = "info"
+
+[[projects]]
+name = "${PROJECT_NAME}"
+reset_on_idle_mins = 0
+
+[projects.agent]
+type = "claudecode"
+
+[projects.agent.options]
+work_dir = "${PROJECT_DIR}"
+mode = "default"
+provider = "anthropic"
+
+[projects.agent.options.env]
+CLAUDE_CODE_OAUTH_TOKEN = ""
+ANTHROPIC_AUTH_TOKEN = ""
+ANTHROPIC_BASE_URL = "https://api.anthropic.com"
+
+[[projects.agent.providers]]
+name = "anthropic"
+api_key = "${CLAUDE_API_KEY}"
+model = "${CLAUDE_MODEL}"
+
+[[projects.platforms]]
+type = "feishu"
+
+[projects.platforms.options]
+app_id = "${FEISHU_APP_ID}"
+app_secret = "${FEISHU_APP_SECRET}"
+allow_from = "${FEISHU_ALLOW_FROM}"
+enable_feishu_card = false
+reaction_emoji = "none"
+group_reply_all = false

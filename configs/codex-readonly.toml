@@ -1,0 +1,29 @@
+# cc-connect v1.5.0. Run with scripts/run-bridge.sh to enforce required inputs.
+language = "zh"
+data_dir = "${BRIDGE_STATE_DIR}"
+
+[log]
+level = "info"
+
+[[projects]]
+name = "${PROJECT_NAME}"
+reset_on_idle_mins = 0
+
+[projects.agent]
+type = "codex"
+
+[projects.agent.options]
+work_dir = "${PROJECT_DIR}"
+backend = "exec"
+mode = "suggest"
+
+[[projects.platforms]]
+type = "feishu"
+
+[projects.platforms.options]
+app_id = "${FEISHU_APP_ID}"
+app_secret = "${FEISHU_APP_SECRET}"
+allow_from = "${FEISHU_ALLOW_FROM}"
+enable_feishu_card = false
+reaction_emoji = "none"
+group_reply_all = false

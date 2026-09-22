@@ -1,0 +1,29 @@
+name: Repository checks
+on:
+  push:
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  offline:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: '3.11'
+      - name: Offline preflight tests
+        run: python -m unittest discover -s tests -v
+      - name: Shell syntax
+        run: |
+          for file in scripts/*.sh examples/*.env.example; do
+            bash -n "$file"
+          done
+      - name: Template syntax
+        run: |
+          python - <<'PY'
+          import json, pathlib, tomllib
+          for path in pathlib.Path('configs').glob('*.toml'):
+              tomllib.loads(path.read_text())
+          json.loads(pathlib.Path('configs/feishu-agent-scopes.json').read_text())
+          PY
