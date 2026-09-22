@@ -1,10 +1,10 @@
 # 复现双机器人与后台服务
 
-本页把实机使用的独立 Supervisor 方案整理为新实例步骤。目标为 Linux x86_64、Python 3.11+、Bash；开机脚本还需要 `flock` 和 `timeout`。首次部署先完成 [输入清单](deployment-inputs.md) 与 [账号及飞书设置](runbook.md)。已有部署只按差异更新，不覆盖运行配置、登录态或会话。
+按本页操作，可以在新服务器上复现这次使用的独立 Supervisor 配置。环境要求为 Linux x86_64、Python 3.11+ 和 Bash，开机脚本还需要 `flock` 与 `timeout`。首次部署先完成 [输入清单](deployment-inputs.md) 与 [账号及飞书设置](runbook.md)。已有部署只按差异更新，不覆盖运行配置、登录态或会话。
 
 ## 1. 安装固定工具
 
-将仓库放到固定目录，例如 `/root/tools/feishu-agent-bootstrap`，执行：
+将仓库放到固定目录，例如 `/root/tools/feishu-agent-bootstrap`，再运行安装器。
 
 ```bash
 cd /root/tools/feishu-agent-bootstrap
@@ -20,11 +20,11 @@ mihomo -v
 
 检查 `command -v supervisord supervisorctl`。优先复用已有安装；当前实机使用 Supervisor 4.2.5。若不存在，在部署专用 Python 环境安装该版本，并把两个可执行文件的绝对路径填入下一步配置，不替换平台正在运行的管理器。
 
-新建专用环境时可安装 `supervisor==4.2.5 setuptools==80.9.0`；4.2.5 使用 `pkg_resources`，干净的新版 Python venv 不一定提供它。发布前在独立环境用这组依赖解析服务模板，避免仅凭系统中旧环境可用就遗漏依赖。
+新建专用环境时可安装 `supervisor==4.2.5 setuptools==80.9.0`；4.2.5 使用 `pkg_resources`，干净的新版 Python venv 不一定提供它。仓库发布前已在独立环境中用这组依赖解析服务模板，新环境安装时也要保留这个依赖。
 
 ## 2. 准备私密目录与配置
 
-新部署在确认目录尚未用于其他项目后执行：
+确认这些目录尚未用于其他项目后，创建目录并复制模板。
 
 ```bash
 umask 077
@@ -37,7 +37,7 @@ cp -n examples/codex.env.example "$HOME/.config/feishu-agent/codex.env"
 cp -n examples/proxy.env.example "$HOME/.config/feishu-agent/proxy.env"
 ```
 
-`cp -n` 避免覆盖旧文件；它不保证旧内容符合新模板。逐个编辑仓库之外的副本：
+`cp -n` 会保留已有文件。若目录里已有旧配置，需要逐项比较新模板。接下来编辑仓库之外的副本。
 
 | 文件 | 填写内容 |
 |---|---|
@@ -67,7 +67,7 @@ bash scripts/agentctl.sh start codex
 bash scripts/agentctl.sh status
 ```
 
-`check` 不是消息往返验收。两个飞书应用都要发布并订阅消息事件；随后分别在手机发送读取测试文件的请求，核对模型实际输出，再验证 [批准与拒绝](acceptance.md)。本次 AutoDL 的 Codex namespace 限制及仅适用于已验收版本的兼容配置，见 [Codex 沙箱记录](codex-server-validation.md#autodl-沙箱兼容性)。不要把该兼容开关无条件用于其他系统。
+`check` 只检查启动条件。两个飞书应用还要完成发布并订阅消息事件，然后分别在手机发送读取测试文件的请求，核对实际结果，再测试 [批准与拒绝](acceptance.md)。本次 AutoDL 的 Codex namespace 限制及仅适用于已验收版本的兼容配置，见 [Codex 沙箱记录](codex-server-validation.md#autodl-沙箱兼容性)。不要把该兼容开关无条件用于其他系统。
 
 首次启动会把模板复制成各自状态目录下的运行 TOML，之后复用该文件。`claude-deepseek` 与 `codex-approval` 模板默认 high。模型名称使用各自账号实际可调用的值；本次实测分别为 deepseek-flash、gpt-6-astra。模板修改不会自动改写现有运行 TOML。
 
@@ -85,7 +85,7 @@ bash scripts/agentctl.sh status
 
 ## 5. 群内协作、换机和保存
 
-- 两个机器人在群里互相派工：按 [群聊协作流程](robot-reuse-and-groups.md) 加入指定群、核实对端 sender ID、设置真实提及和话题会话边界。当前停止规则为提示词约定，没有硬性轮数上限。
-- 手机切模型与会话：按 [会话与认证设计](session-and-auth.md)，注意 `/reasoning high`、`/provider switch` 会重置当前会话关联。
-- 换机器：复用原飞书应用，停止旧节点，迁移项目和私密会话后启动新节点，按 [迁移流程](migration.md) 验收。
+- 要让两个机器人在群里互相派工，按 [群聊协作流程](robot-reuse-and-groups.md) 加入指定群、核实对端 sender ID、设置真实提及和话题会话边界。当前停止规则为提示词约定，没有硬性轮数上限。
+- 要在手机切换模型或会话，先看 [会话与认证设计](session-and-auth.md)，注意 `/reasoning high`、`/provider switch` 会重置当前会话关联。
+- 换机器时复用原飞书应用，停止旧节点，迁移项目和私密会话后启动新节点，按 [迁移流程](migration.md) 验收。
 - 此仓库保存方案与模板；实际 env、代理节点、OAuth 缓存、原始日志和会话需在仓库之外单独备份。

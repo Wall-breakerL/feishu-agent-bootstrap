@@ -1,8 +1,8 @@
 # 部署流程
 
-目标：新实例初始化后，在手机飞书上完成可验证的项目操作。第一版范围为个人使用、每个机器人一个活跃实例和一个项目；两种引擎分别部署两个机器人。需要并发管理多个实例时先看架构文档。
+这份教程从新服务器开始，直到你能在手机飞书上发任务，并收到来自指定项目目录的正确结果。先按个人使用部署，每个机器人连接一个实例、操作一个项目；Claude Code 和 Codex 各用一个机器人。需要同时管理多台服务器时，先看 [架构说明](architecture.md)。
 
-当前实机采用原生二进制安装器和独立 Supervisor。需要复现这一组合时，配合 [后台服务步骤](service-setup.md) 使用；下面的 npm、tmux 是可选部署方式，不与 Supervisor 同时启动同一个机器人。
+本次实机使用原生二进制安装器和独立 Supervisor，具体命令见 [后台服务步骤](service-setup.md)。下文同时保留 npm 安装和 tmux 运行方式，供其他环境选择。同一个机器人只选一种后台运行方式，避免重复接收消息。
 
 ## 0. 输入与完成标准
 
@@ -17,31 +17,31 @@
 | 模型 key 或交互登录 | 私密文件、环境或用户浏览器 | 重新注入/登录 |
 | 外部备份位置与任务预算 | 用户指定 | 每个项目明确 |
 
-“完成”必须有：手机收到来自目标目录的正确回复、权限分支验证、SSH 断开后的使用验证、运行方式与恢复回执。安装命令成功不算端到端完成。
+部署完成后，应能拿出四项结果。手机收到目标目录的正确回复，批准和拒绝操作都符合预期，断开 SSH 后仍能使用，并且留下启动、停止和恢复方法。仅安装成功还不够。
 
 ## 1. 飞书侧一次性设置
 
 按 [飞书官方长连接说明](https://open.feishu.cn/document/server-docs/event-subscription-guide/event-subscription-configure-/request-url-configuration-case) 和 [cc-connect v1.5.0 飞书文档](https://github.com/chenhg5/cc-connect/blob/v1.5.0/docs/feishu.md) 在开放平台创建自建应用，启用机器人，设置可用范围为本人。使用的是可接收事件的应用机器人，不是只有发送 Webhook 的群自定义机器人。
 
-首次创建机器人也可以用 `cc-connect feishu new` 的扫码入口，自动回填凭证和本应用下的用户 open_id；本项目已用该入口创建 Codex 应用，见 [Codex 实机记录](codex-server-validation.md)。临时配置必须放在私密目录，核验白名单后才启动服务。**更换服务器时复用原应用凭证，不重新扫码创建应用。**
+更省事的创建方式是运行 `cc-connect feishu new`，在手机扫码授权后，由工具回填凭证和当前应用下的用户 open_id。本次两个智能体应用都通过这个入口创建，流程见 [Codex 实机记录](codex-server-validation.md)。临时配置放在私密目录，确认白名单后再启动服务。**更换服务器时复用原应用凭证，不重新扫码创建应用。**
 
 若选择让两个应用具备相同的扩展权限和创建类型，两者都使用上述扫码入口，再按 [飞书权限对齐流程](feishu-permission-preset.md) 比较实际授权清单。该文档也保留了已有应用原地增加权限的可选流程；原地升级不改变应用创建来源或客户端展示类型。
 
-先只做私聊文本链路：申请读取用户发给机器人的单聊消息 `im:message.p2p_msg:readonly` 和发送消息 `im:message:send_as_bot` 所需权限；权限依据[飞书官方接收消息事件](https://open.feishu.cn/document/server-docs/im-v1/message/events/receive)，发送权限以控制台对应 API 要求为准。有额外的元信息或发消息权限错误时按错误码补充。暂不为了单聊开通“读取群内所有消息”。
+手动配置时，先让私聊文本消息正常收发。申请读取用户发给机器人的单聊消息 `im:message.p2p_msg:readonly` 和发送消息 `im:message:send_as_bot` 所需权限；权限依据[飞书官方接收消息事件](https://open.feishu.cn/document/server-docs/im-v1/message/events/receive)，发送权限以控制台对应 API 要求为准。有额外的元信息或发消息权限错误时按错误码补充。暂不为了单聊开通“读取群内所有消息”。
 
-事件订阅选择“使用长连接接收事件”，添加 `im.message.receive_v1`。部分控制台步骤需要服务端先建立长连接，届时先完成第 2—5 步并前台启动，再返回保存订阅。发布应用版本，核验可用范围和权限已生效。
+事件订阅选择“使用长连接接收事件”，添加 `im.message.receive_v1`。部分控制台步骤需要服务端先建立长连接，届时先完成第 2 到 5 步并前台启动，再返回保存订阅。发布应用版本，核验可用范围和权限已生效。
 
 必须检查“已添加事件”表中实际出现 `im.message.receive_v1`；只看到“长连接”或连接成功不足以证明订阅完成。若该选项灰色，先核对所需消息权限。补齐后重新发送测试消息，不假设旧消息会补投递。
 
 本项目模板默认纯文本回复且不发 reaction，减少初次接入依赖。需要交互卡片时再打开 `enable_feishu_card`，配置长连接回调 `card.action.trigger`，补充控制台要求的卡片权限并重新发布；卡片按钮必须测试批准和拒绝。
 
-可选：上游 `cc-connect feishu setup --project my-project` 提供扫码创建/关联流程，可能回填凭证及白名单，并修改它选中的配置文件。使用前检查该路径是否已有配置，避免影响其他机器人；本项目模板不依赖该自动配置流程。不要把带 App Secret 的 `--app id:secret` 命令保存进历史或文档。
+上游还提供 `cc-connect feishu setup --project my-project` 命令，用于扫码创建或关联应用，可能回填凭证及白名单，并修改它选中的配置文件。使用前检查该路径是否已有配置，避免影响其他机器人；本项目模板不依赖该自动配置流程。不要把带 App Secret 的 `--app id:secret` 命令保存进历史或文档。
 
 获取本人在**这个应用下**的 `open_id`，用于 `FEISHU_ALLOW_FROM`。用户 ID、邮箱、手机号、另一应用的 open_id 不能混用。白名单确认后，`/whoami` 可用于复核；不得为了获取 ID 长期留空或设为 `*`。
 
 ## 2. 新实例只读预检
 
-用用户提供的 SSH alias 进入实例，核验服务器身份与主机指纹。检查：
+用用户提供的 SSH alias 进入实例，核验服务器身份与主机指纹。先运行以下命令。
 
 ```bash
 uname -sm
@@ -53,7 +53,7 @@ command -v bash git node npm tmux cc-connect codex claude
 
 另查已有 bridge、agent 和训练进程，避免重复启动。确认目标项目的实际路径与目录所有权。若要 GPU 实验，再检查 GPU/CUDA；桥接自身不需要 GPU。
 
-需要到 GitHub/软件源、飞书 API 和其协商出的 WebSocket 地址、所选模型及登录服务的出站连接。不要把 WebSocket 目标固定猜成飞书 API 域名；以 SDK 日志中的域名检查。只访问首页获得 HTTP 响应仅能证明有限连通性，模型 smoke test 才能证明调用。
+服务器需要访问软件下载源、飞书 API、飞书协商出的 WebSocket 地址，以及模型和登录服务。WebSocket 的实际域名从 SDK 日志中确认。首页能打开，只能证明该地址可达；接下来还要完成模型的最小调用测试。
 
 如果网络不满足，记录具体失败层；仅采用用户已授权、符合服务商条件的网络配置，不自动关闭 TLS 校验。
 
@@ -65,7 +65,7 @@ command -v bash git node npm tmux cc-connect codex claude
 
 先检查是否已安装、是否其他项目在使用。CLI 与桥接应以同一 OS 用户运行，保证读取的是同一份登录状态；不要在 root 登录后换用户启动而不迁移授权。
 
-本项目冻结 `cc-connect@1.5.0`。安装示例使用独立 npm prefix，不替换系统的全局 agent；执行前需已有受所选 CLI 支持的 Node.js/npm：
+本项目固定使用 `cc-connect@1.5.0`。下面安装到独立 npm prefix，保留系统已有的全局 agent。执行前先确认 Node.js/npm 版本满足所选 CLI 的要求。
 
 ```bash
 npm install --prefix "$HOME/.local/feishu-agent-cli" cc-connect@1.5.0
@@ -75,7 +75,7 @@ cc-connect --version
 
 也可以使用 [正式版发行包](https://github.com/chenhg5/cc-connect/releases/tag/v1.5.0)，按 `uname -m` 选 Linux amd64/arm64 并核对校验和。不要把当前 release 的文件名猜成旧教程的裸二进制下载地址。
 
-agent 版本由已有验收基线决定；没有基线时从官方选择候选版本，记录并在第 6 步验收。例如已设置准确版本变量后：
+agent 版本由已有验收基线决定；没有基线时从官方选择候选版本，记录并在第 6 步验收。选定准确版本后再执行下面的命令。
 
 ```bash
 # 只执行所选路线。变量应是确切版本号，不是 latest。
@@ -88,25 +88,25 @@ npm install --prefix "$HOME/.local/feishu-agent-cli" "@openai/codex@$AGENT_CLI_V
 
 Claude Code 也可走官方原生安装器的指定版本安装；记录其自动更新设置。需要冻结候选基线时，在该部署环境设置 `DISABLE_AUTOUPDATER=1`，后续升级显式重新验收。cc-connect 和 agent 是两个独立版本，不只记录一个。
 
-将本项目文件放到服务器上的独立目录，例如 `/root/tools/feishu-agent-bootstrap`。恢复目标项目的 Git revision、依赖和必要文件。不要覆盖已有未提交修改；迁移不是 `git reset --hard`。
+将本项目文件放到服务器上的独立目录，例如 `/root/tools/feishu-agent-bootstrap`。恢复目标项目的 Git revision、依赖和必要文件。恢复前先检查并保存未提交修改，不要用 `git reset --hard` 覆盖现场。
 
 ## 4. 先单独验证模型登录
 
-### Codex：仅 ChatGPT 账号
+### Codex 使用 ChatGPT 账号
 
 在已载入代理环境的服务器 shell 执行 `codex login --device-auth`，用户在自己浏览器中打开官方链接并输入一次性码。设备码功能需要账号/组织允许。成功后执行 `codex login status`，确认使用 ChatGPT 账号；检查本次环境、Codex 配置是否仍有 API key、自定义 provider 或旧 API 登录冲突。只处理目标机对应配置，不改本机其他任务的登录。
 
 设备码不可用时按 [OpenAI 官方 headless 说明](https://learn.chatgpt.com/docs/auth#login-on-headless-devices) 使用 SSH 转发 localhost 登录回调。已存在的 file-based 登录缓存通过 SSH 复制只作为明确确认后的备选；缓存视为密码，绝不进 Git 或公开镜像。设备码不需要公网回调，但仍要服务器能访问认证与模型服务。
 
-在测试 Git 目录执行最小请求：回复随机字符串，再读取已知内容文件。只有登录状态正常而没有实际模型回复，不算通过。
+进入测试 Git 目录，让 Codex 先回复一个随机字符串，再读取内容已知的文件。两项都成功，才能确认账号在这台服务器上确实可用。
 
-### Claude Code：API 模型
+### Claude Code 使用 API 模型
 
-- `claude-anthropic`：用户提供 `CLAUDE_API_KEY` 与 `CLAUDE_MODEL`，模板走官方 Anthropic API。
-- `claude-deepseek`：用户提供 `DEEPSEEK_API_KEY` 与 `DEEPSEEK_MODEL`，走 `https://api.deepseek.com/anthropic`。
-- 其他 API：先确认服务商 Anthropic Messages 兼容接口、认证头与工具支持，再在私密运行配置中添加 provider；仅 OpenAI 格式的 endpoint 不能直接填入。
+- 使用 `claude-anthropic` 时，用户提供 `CLAUDE_API_KEY` 与 `CLAUDE_MODEL`，模板走官方 Anthropic API。
+- 使用 `claude-deepseek` 时，用户提供 `DEEPSEEK_API_KEY` 与 `DEEPSEEK_MODEL`，走 `https://api.deepseek.com/anthropic`。
+- 接入其他 API 时，先确认服务商 Anthropic Messages 兼容接口、认证头与工具支持，再在私密运行配置中添加 provider；仅 OpenAI 格式的 endpoint 不能直接填入。
 
-这两条 Claude 模板不要求 Claude 订阅登录。先核对并清除当前部署环境中冲突的 OAuth、gateway、Bedrock/Vertex/Foundry 设置；不要修改其他项目的全局环境。单独测试 DeepSeek CLI 的示例：
+这两条 Claude 模板不要求 Claude 订阅登录。先核对并清除当前部署环境中冲突的 OAuth、gateway、Bedrock/Vertex/Foundry 设置；不要修改其他项目的全局环境。可以在独立 shell 中按下面的方式测试 DeepSeek。
 
 ```bash
 (
@@ -127,9 +127,9 @@ Anthropic 路线在独立 shell 设置 `ANTHROPIC_API_KEY="$CLAUDE_API_KEY"`、�
 
 将 `examples/bridge.env.example` **复制到代码仓库之外**，例如 `~/.config/feishu-agent/bridge.env`。目录 `700`、文件 `600`，由用户在安全编辑器中填写。不在聊天、终端日志、`env`、`ps e` 或命令参数中展示密钥。
 
-`PROJECT_DIR` 应指向已经恢复的项目目录；`BRIDGE_STATE_DIR` 是独立、仅当前用户可访问的状态目录。源仓库的模板只保留 `${VAR}`。首次运行生成 `BRIDGE_STATE_DIR/config.<profile>.toml`：只展开项目名，保留密钥占位符；此后复用，不在重启时覆盖手机选择的模型。已有状态目录必须提前确认为私密目录。
+`PROJECT_DIR` 应指向已经恢复的项目目录；`BRIDGE_STATE_DIR` 是独立、仅当前用户可访问的状态目录。源仓库的模板只保留 `${VAR}`。首次运行会生成 `BRIDGE_STATE_DIR/config.<profile>.toml`，只展开项目名，保留密钥占位符。之后复用这份文件，手机选择的模型才能跨重启保留。已有状态目录必须提前确认为私密目录。
 
-进入本项目根目录，在 Bash 中运行：
+进入本项目根目录，在 Bash 中运行以下命令。
 
 ```bash
 set +x
@@ -149,7 +149,7 @@ bash scripts/run-bridge.sh claude-deepseek
 
 先前台观察连接成功，在手机私聊机器人发送随机标记，完成 [验收清单](acceptance.md) 的最小测试，再用 Ctrl-C 正常停止前台实例。确认旧进程退出后启动后台，不能前后台各开一个。
 
-AutoDL 容器没有正常 systemd 时，先用独立 tmux session：
+AutoDL 容器没有正常运行的 systemd 时，可以先用独立 tmux session。已经使用 Supervisor 的实例跳过这一步。
 
 ```bash
 tmux new-session -s feishu-agent
@@ -164,7 +164,7 @@ bash scripts/run-bridge.sh claude-deepseek
 # 按 Ctrl-b，然后 d，分离会话。
 ```
 
-不同 OS 用户需要替换示例绝对路径。停止：`tmux attach -t feishu-agent` 后 Ctrl-C，检查已退出。不要误杀训练 session。不要默认使用 `--force` 杀掉未确认归属的 cc-connect 实例。
+不同 OS 用户需要替换示例绝对路径。需要停止时，执行 `tmux attach -t feishu-agent`，按 Ctrl-C 后确认进程退出。不要误杀训练 session。不要默认使用 `--force` 杀掉未确认归属的 cc-connect 实例。
 
 tmux 只处理断开 SSH，不自动重启崩溃进程。真实 systemd 可用时，可依据上游 daemon 文档配置服务，或将同样的启动入口放入服务管理器。必须显式载入私密环境和完整 PATH，验证用户级服务在退出登录后的存活，以及实际重启。不要把 `.bashrc` 假定为服务的环境来源，也不要同时使用两种守护方式。
 
@@ -182,8 +182,8 @@ tmux 只处理断开 SSH，不自动重启崩溃进程。真实 systemd 可用�
 
 长训练由独立 tmux / 作业调度器启动，分配唯一任务 ID，记录启动命令、PID/session、stdout/stderr、退出码和 checkpoint。agent 短时间检查日志与产物，然后返回飞书；不把几小时训练绑在一次模型工具调用上。结束消息要区分“进程结束”和“结果通过验收”。
 
-需要周期检查时才启用上游 heartbeat：固定项目与实际 session_key、空闲时执行、明确每轮上限、只在完成/失败/需要用户处理时通知。`silent` 只是不发送启动提示，不代表业务回复全部静默；提示词需要说明通知条件。heartbeat 的配置字段见固定版本 config.example.toml；用 `/heartbeat`、`/heartbeat pause`、`/heartbeat run` 核验状态和实际行为。不要猜测 session_key，使用当前版本实际提供的会话信息，且不要公开含用户内容的日志。
+需要定期检查任务时，再启用上游 heartbeat。指定项目与实际 session_key，让检查在空闲时执行，设置每轮上限，并只在完成、失败或需要用户处理时通知。`silent` 只是不发送启动提示，不代表业务回复全部静默；提示词需要说明通知条件。heartbeat 的配置字段见固定版本 config.example.toml；用 `/heartbeat`、`/heartbeat pause`、`/heartbeat run` 核验状态和实际行为。不要猜测 session_key，使用当前版本实际提供的会话信息，且不要公开含用户内容的日志。
 
 ## 8. 部署回执
 
-在私有记录中写入：日期、实例脱敏标识、项目 revision、cc-connect 和 agent 准确版本、模型/provider、认证类别、profile、工作/状态目录、进程管理方式、各验收项结果、备份位置、下一步。无凭证时只交付准备状态，不标记真实部署完成。
+使用 [验收清单里的回执模板](acceptance.md#回执模板)，记录版本、模型、认证方式、工作和状态目录、进程管理方式、测试结果与备份位置。再补上下一步操作，让后续接手的人能继续部署或恢复。缺少凭证时，写清已准备到哪一步。

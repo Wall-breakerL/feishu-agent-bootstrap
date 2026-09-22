@@ -1,10 +1,10 @@
 # AutoDL 上的 Clash / Mihomo 与启动恢复
 
-调研日期：2026-09-21；实机状态更新至 2026-09-22。本页记录代理设计与通用步骤；当前实例已完成服务器代理、账号登录及飞书往返。开机钩子的接入与验证边界见 [实机操作记录](server-operations.md#重启与自启的当前状态)。
+本页说明如何让服务器自己运行代理，以便本地电脑离线后，Codex 仍能登录和回复。方案调研于 2026-09-21，实机记录更新至 2026-09-22。服务器代理、账号登录及飞书收发已经跑通；开机恢复的测试范围见 [实机操作记录](server-operations.md#重启与自启的当前状态)。
 
 ## 方案
 
-在服务器运行无图形界面的 **Mihomo（Clash Meta 内核）**，用本机 HTTP/mixed 端口给登录 shell、cc-connect 和 agent 子进程提供出站代理。用户还需提供能用的订阅配置或节点；安装内核本身不产生可用线路。
+在服务器运行无图形界面的 **Mihomo（Clash Meta 内核）**，用本机 HTTP/mixed 端口给登录 shell、cc-connect 和 agent 子进程提供出站代理。新部署还需要准备可用的订阅配置或节点，Mihomo 负责使用这些线路。
 
 ```mermaid
 flowchart LR
@@ -19,7 +19,7 @@ flowchart LR
     N --> O[认证与模型服务]
 ```
 
-这条路线不要求把整台机器变成系统 VPN。先采用进程环境代理，验证足够后再决定是否需要 TUN；不把容器中的 `/dev/net/tun` 或 `NET_ADMIN` 能力当作前提。Mihomo 的 [mixed 端口文档](https://wiki.metacubex.one/config/inbound/port/)确认可接收 HTTP(S) 与 SOCKS 请求。
+先把代理地址传给需要联网的进程即可，通常无须开启整机 TUN。这样也省去了对容器 `/dev/net/tun` 和 `NET_ADMIN` 能力的依赖；确有其他需求时再单独评估。Mihomo 的 [mixed 端口文档](https://wiki.metacubex.one/config/inbound/port/)确认可接收 HTTP(S) 与 SOCKS 请求。
 
 ## 新服务器操作顺序
 
@@ -30,7 +30,7 @@ flowchart LR
 5. 在独立部署 shell 载入 [代理环境示例](../examples/proxy.env.example)，先完成登录与最小模型请求，再启动 cc-connect；继承到子进程的环境需要在实际服务进程中验证。
 6. 通过手机验收后接入适合实例的进程管理和开机恢复入口；做一次真实关机/开机验证，才称作自动恢复。
 
-拟合并的局部字段：
+可以将下面这些监听字段合并到完整配置中。
 
 ```yaml
 mixed-port: 7890
@@ -47,13 +47,13 @@ profile:
 
 ## 环境应该传给谁
 
-`HTTP_PROXY` 与 `HTTPS_PROXY` 均可指向 `http://127.0.0.1:7890`：这里的协议表示到本地代理的连接方式，HTTPS 目标仍经 CONNECT/TLS。同时设置常见小写变量；检查并清理专用 shell 里冲突的 `ALL_PROXY`。
+`HTTP_PROXY` 与 `HTTPS_PROXY` 均可指向 `http://127.0.0.1:7890`。这里的 `http` 表示进程连接本地代理的方式，访问 HTTPS 目标仍使用 CONNECT/TLS。同时设置常见小写变量；检查并清理专用 shell 里冲突的 `ALL_PROXY`。
 
 建议仅在这套 bridge/login 的环境文件中设置，避免全局改写 `.bashrc` 干扰训练和下载。用 `NO_PROXY/no_proxy` 或 Mihomo 规则让飞书、国内 API 按实际连通性直连；飞书长连接的 WebSocket 域名由 SDK 协商，应查看真实日志，不能只配置 `open.feishu.cn` 就假定所有事件连接都绕过代理。
 
-不仅 agent 子进程可能请求外网，cc-connect 的模型列表查询也可能自己访问 API。只给子进程设置代理时，会出现“能对话但 `/model` 拉列表失败”；显式模型列表可以避免这类元数据请求。第三方 provider 的内部兼容代理还可能修改 NO_PROXY，因此切 provider 后也要检查实际行为。
+cc-connect 查询模型列表时，也可能直接访问 API。因此，只给 agent 子进程设置代理，可能出现对话正常、`/model` 却获取失败的情况。可以配置明确的模型列表，减少这类请求。第三方 provider 的内部兼容代理还可能修改 NO_PROXY，切换后需要重新检查实际连接。
 
-本方案不依赖未经官方证实的 Codex `[proxy]` TOML 配置。当前 CLI 对代理的最终支持、ChatGPT 认证域名和推理链路均在目标版本验证；某博客中请求 `api.openai.com` 返回 401，只能说明这一次 HTTP 请求有响应，不能证明 ChatGPT 登录、token 刷新和 Codex 回复都可用。
+本方案通过进程环境传递代理地址，没有使用博客中未经官方证实的 Codex `[proxy]` TOML 配置。验收时要在目标版本上分别检查登录、凭证刷新和模型回复。请求 `api.openai.com` 返回 401，只能说明这次 HTTP 请求得到了响应。
 
 ## 开机后恢复的顺序
 
@@ -72,14 +72,12 @@ profile:
 
 代理配置、选择缓存、bridge 运行配置、agent 原生历史和凭证各自保存。换机前做私密备份；凭证不打进公开镜像或项目 Git。
 
-2026-09-22 实施更新：已有独立原生安装器、Supervisor 启动入口与目标机检查，见 [实机操作文档](server-operations.md)。尚缺用户代理节点和平台开机钩子；上面的初版设计不等于自动上线已通过。
-
 ## 技术博客提供了什么，哪些不照搬
 
 | 技术文章 | 参考价值 | 对本方案的取舍 |
 |---|---|---|
-| [huicod：Cursor 远程连接 AutoDL 并使用 Codex](https://huicod.github.io/blog/cursor-autodl-codex/)，2026-08-25 | 实操讨论本地 Clash 经 SSH RemoteForward 给远端进程使用、环境变更后重启远端进程 | 适合临时调试；持续运行会依赖电脑与 SSH 隧道，所以主方案采用服务器 Mihomo。不采信其自定义 Codex proxy 配置为官方支持 |
-| [freemedom：AutoDL 使用 Clash 代理加速](https://gist.github.com/freemedom/ea74d923aa5040a62b80c6affa4d5473)，页面最后活动 2026-08-07 | 记录下载工具本身慢、先本地下载再上传的实践 | 采用离线上传思路；不跟随其“一定开 TUN”的做法，也不把作者网络体验推广为所有实例结论 |
+| [huicod 的 Cursor 远程连接 AutoDL 并使用 Codex](https://huicod.github.io/blog/cursor-autodl-codex/)，2026-08-25 | 实操讨论本地 Clash 经 SSH RemoteForward 给远端进程使用、环境变更后重启远端进程 | 适合临时调试；持续运行会依赖电脑与 SSH 隧道，所以主方案采用服务器 Mihomo。不采信其自定义 Codex proxy 配置为官方支持 |
+| [freemedom 的 AutoDL 使用 Clash 代理加速](https://gist.github.com/freemedom/ea74d923aa5040a62b80c6affa4d5473)，页面最后活动 2026-08-07 | 记录下载工具本身慢、先本地下载再上传的实践 | 采用离线上传思路；不跟随其“一定开 TUN”的做法，也不把作者网络体验推广为所有实例结论 |
 
 博客用来发现操作问题，支持范围以产品官方文档和选定源码为准。没有运行博客提供的安装脚本，也没有把其“成功”当成本项目的部署证明。
 

@@ -1,10 +1,12 @@
 # 两个应用使用一致的飞书权限
 
-`configs/feishu-agent-scopes.json` 是 2026-09-22 从已创建的 Server Codex 应用实际授权清单提取的配置快照：35 项应用身份权限、1 项用户身份权限。它用于用户明确选择的扩展功能路线，包含消息、附件、卡片、文档、评论、知识库节点及应用自身管理等能力；不是所有简单聊天机器人的最低要求。
+Server CC 和 Server Codex 最初使用了不同的创建方式，飞书中的展示类型和权限也有差别。为统一后续可用的能力，我们把 Server Codex 在 2026-09-22 的实际授权清单保存为 `configs/feishu-agent-scopes.json`，共 35 项应用身份权限、1 项用户身份权限。
+
+这份清单包含消息、附件、卡片、文档、评论、知识库节点及应用自身管理等权限，适用于本项目选择的扩展功能。只需要简单聊天时，无须照单申请全部权限。
 
 ## 为已有机器人对齐权限
 
-若希望应用类型与扫码创建的 Server Codex 一致，采用下一节的新建流程。下面的原地升级方案只增加旧应用权限，不改变其创建来源或客户端展示类型。
+如果只想补齐权限，可以保留原应用，按下面的步骤修改。如果还想让创建方式和客户端展示类型与 Server Codex 一致，跳到下一节，用同一个扫码入口新建应用。
 
 1. 保留原 App ID、App Secret、用户白名单、cc-connect project name 和状态目录。增加权限不需要新建机器人，也不需要重新登录模型。
 2. 在飞书后台进入目标应用的“权限管理 → 批量处理 → 批量导入/导出权限”，导入 [权限 JSON](../configs/feishu-agent-scopes.json)。
@@ -31,15 +33,15 @@
 
 ### 2026-09-22 实机结果
 
-已按用户选择，用该流程重新创建 Server CC，飞书客户端显示“智能体”。实际权限集合及授权状态与 Server Codex 完全相同：35 项应用身份权限、1 项用户身份权限；两者均配置 WebSocket `card.action.trigger` 回调。
+已按用户选择，用该流程重新创建 Server CC，飞书客户端显示“智能体”。实际权限集合及授权状态与 Server Codex 完全相同，均为 35 项应用身份权限、1 项用户身份权限；两者均配置 WebSocket `card.action.trigger` 回调。
 
-切换前停止 API bridge，并将唯一操作者的旧会话键映射到新应用的私聊 chat_id 和 owner open_id，保持原 bridge session 与 Claude 原生 session 不变。新应用真实消息触发同一原生会话恢复：先凭历史正确复述旧暗号，再仅调用一次 Read 读出新验收文件。项目目录、DeepSeek Flash 配置和模型认证保持原值。
+切换前停止 API bridge，并将唯一操作者的旧会话键映射到新应用的私聊 chat_id 和 owner open_id，保持原 bridge session 与 Claude 原生 session 不变。新应用收到真实消息后，恢复了同一个原生会话。模型先凭历史正确复述旧暗号，再调用一次 Read 读出新验收文件。项目目录、DeepSeek Flash 配置和模型认证保持原值。
 
 新入口验证成功后，用户确认删除旧应用；后台列表不再显示旧应用，旧凭证认证返回 `10217 / app has been deleted`，新凭证认证成功。服务器保留迁移前的私密配置与会话备份。此次是同一服务器更换飞书应用的验证，不代替整机关机恢复或换机验收。
 
 ## 事件及回调
 
-此快照对应的已具备权限的应用身份事件为：
+该快照中，已具备所需权限的应用身份事件如下。
 
 ```text
 im.message.receive_v1
@@ -52,7 +54,7 @@ drive.notice.comment_add_v1
 
 事件和回调均使用长连接，卡片回调为 `card.action.trigger`。保存时按平台要求保持目标 bridge 在线；同一 App ID 只保留一个活跃桥接。
 
-扫码生成的 Codex 应用另列出三个用户身份事件：`vc.meeting.participant_meeting_ended_v1`、`vc.note.generated_v1`、`minutes.minute.generated_v1`，但本快照没有开通它们所需的会议/纪要权限。不要为了复制这三个未具备权限的配置项而额外申请超出目标清单的权限。
+扫码生成的 Codex 应用还列出了三个用户身份事件，分别是 `vc.meeting.participant_meeting_ended_v1`、`vc.note.generated_v1`、`minutes.minute.generated_v1`，但本快照没有开通它们所需的会议/纪要权限。不要为了复制这三个未具备权限的配置项而额外申请超出目标清单的权限。
 
 ## 配好权限后还需什么
 
@@ -62,4 +64,4 @@ drive.notice.comment_add_v1
 - 飞书权限与 Claude Code / Codex 的服务器执行审批分别配置。权限对齐不改变两种 CLI 的执行模式。
 - 发布后验证原会话的文本往返、会话 ID 与聊天暗号；附件、交互卡片等功能启用时分别实测。
 
-依据：[飞书权限说明](https://open.feishu.cn/document/ukTMukTMukTM/uQjN3QjL0YzN04CN2cDN)、[查询授权状态](https://open.feishu.cn/document/application-v6/scope/list)，以及本次应用后台和只读 API 检查。
+依据为 [飞书权限说明](https://open.feishu.cn/document/ukTMukTMukTM/uQjN3QjL0YzN04CN2cDN)、[查询授权状态](https://open.feishu.cn/document/application-v6/scope/list)，以及本次应用后台和只读 API 检查。
