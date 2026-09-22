@@ -32,6 +32,7 @@ flowchart LR
 - 群里已完成一轮 Codex 派工、CC 执行并回报、Codex 验收。两边默认推理强度均为 `high`，对话按群话题保存，工具审批仍然保留。
 - 服务器通过 Mihomo 访问 Google 返回 HTTP 200。用户重启实例后，配置和会话文件仍在；随后补上了开机钩子，并验证它能从三个服务全部停止的状态恢复运行。
 - 已将两个 bot 的配置、登录态、会话文件和测试工作目录迁到另一台 AutoDL 实例；697 个文件核验一致，新机两条飞书连接上线，旧机 bridge 停止。原生续聊和手机往返的验收状态见 [换机记录](docs/server-migration-validation.md)。
+- 已将最新会话加密保存到腾讯云，并在旧实例 SSH 不可用时从备份恢复到第三个 AutoDL 实例。554 个文件和 6 个数据库通过核验，两边各载入 6 个会话并连上飞书，手机续聊仍待验收。
 
 **新机本次手动启动，开机策略留待讨论；其他用户加入群聊仍待实测。** 旧机 bot 开机入口已备份并暂时停用，避免再次上线争抢消息。机器人协作目前依靠提示词约定结束，还没有程序强制的轮数上限。详细过程见 [服务器记录](docs/server-operations.md)、[Codex 记录](docs/codex-server-validation.md) 和 [群聊协作](docs/robot-reuse-and-groups.md)。
 
@@ -47,6 +48,8 @@ flowchart LR
 API 模型统一由 Claude Code 接入，Codex 只用 ChatGPT 账号登录。第三方 API 需要提供 Anthropic 兼容接口。代理使用服务器上的 Mihomo，先确认出口可用，再登录 Codex，具体见 [代理配置](docs/proxy.md)。
 
 如果需要在 GPU 服务器关机时继续讨论项目，可以考虑 [常驻控制机方案](docs/architecture.md)。那需要另一台保持在线的机器，目前只整理了设计。
+
+我们已用腾讯云搭建 [常驻备份站](docs/backup-hub.md)，保存经过回读和解密验证的会话快照。以后换机可从这里恢复最后一次备份，两个 agent 仍在当前 AutoDL 实例运行。
 
 ## 按你的情况往下读
 
@@ -82,4 +85,4 @@ bash -n scripts/run-bridge.sh
 
 版本选择和配置依据放在 [调研记录](docs/research.md)。我们核对了固定版本源码，例如 Codex 的 `exec` 后端在 `suggest` 模式下只读且不交互审批，需要飞书审批时应使用已验证的 app-server 路线。
 
-真实密钥、代理节点、登录缓存、服务器地址和原始会话不随 Git 保存。这些材料需要在仓库之外单独备份。
+真实密钥、代理节点、登录缓存、服务器地址和原始会话不随 Git 保存。本机凭证可放在被忽略的 `secrets/` 目录，私密状态在实例外加密备份。
